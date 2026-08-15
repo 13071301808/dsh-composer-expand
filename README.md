@@ -1,79 +1,77 @@
 # dsh-composer-expand
 
-Composer expand toggle for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`). A ⬆/⬇ button in the composer tool row toggles the input between the default capped height and a tall 70vh writing view, so long drafts no longer scroll inside a tiny window.
+为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）打造的 composer 展开/收起插件。在 composer 工具行放一个 ⬆/⬇ 按钮，点击在「默认封顶高度」与「70vh 高书写视图」之间切换，长草稿不再挤在一个小窗口里滚动。
 
-## Why
+## 为什么需要
 
-The harness caps the composer textarea at a small height by default (the seat sets `--dsh-composer-text-max-height: 336px`, which caps the textarea scrollport). When the draft grows long, you end up scrolling inside a few lines instead of seeing the whole draft. This plugin keeps the default behavior for short drafts and offers a one-click toggle for the times when you are writing a long prompt.
+DSH 默认把 composer 文本框封顶在一个较小高度（seat 上定义了 `--dsh-composer-text-max-height: 336px`，限制文本框滚动容器）。草稿变长后，只能在小窗口里滚动几行。本插件对短草稿保持默认行为，写长 prompt 时一键切换到大视图。
 
-## Features
+## 功能
 
-- **⬆ button in the composer tool row** — sits in `conversation.input.right`, the official seat for clickable controls beside the send button.
-- **Grows composer to 70vh on expand** — flips a CSS class on the conversation scrollport; the composer card + textarea both relax their `max-height`. Click again to restore the default capped height.
-- **Persists per browser** — the toggle writes `localStorage[dsh-composer-expand:expanded]` so the choice survives reloads and workspace switches.
-- **i18n zh/en** — button label and tooltip follow the harness `locale` service.
-- **No custom wire protocol** — pure client-side CSS toggle; no host command, no LLM call, no session log entry.
-- **Localize-safe** — anchors the CSS on DSH's stable `data-conversation-scroll` / `data-conversation-composer-overlay` data attributes, not on hashed classnames that change per build.
+- **⬆ 按钮在 composer 工具行** — 位于 `conversation.input.right`（发送按钮旁官方预留的可点击控件位）。
+- **展开到 70vh** — 在会话滚动容器上切换 CSS class；composer 卡片与 textarea 同步放宽 `max-height`。再点一次恢复默认封顶高度。
+- **浏览器内持久化** — 状态写入 `localStorage[dsh-composer-expand:expanded]`，刷新页面、切换工作区都保留。
+- **中英文双语** — 按钮文案与提示跟随 DSH 的 `locale` 服务。
+- **纯前端** — 无自定义协议、无 host 命令、无 LLM 调用、不进会话日志。
+- **不依赖构建哈希** — CSS 锚定 DSH 稳定的 `data-conversation-scroll` / `data-composer-seat` / `data-input-mirror` 属性，而不是每次构建都会变的哈希类名。
 
-## Install
+## 安装
 
-### From npm (recommended)
+### 通过 npm 安装（推荐）
 
 ```sh
 dsh plugin --profile web add dsh-composer-expand
 ```
 
-Published to npm — prebuilt bundles, no build step.
+已发布到 npm，包含预构建产物，无需本地构建。
 
-### From source (local development)
+### 源码本地开发
 
-The `dsh` CLI must be on your `PATH`. If you only ever ran the harness through `npx`, `dsh` is not installed and you will get `zsh: command not found: dsh` — install it globally first:
+`dsh` CLI 必须在 `PATH` 上。若你只用 `npx` 跑过 harness，`dsh` 尚未全局安装，会报 `zsh: command not found: dsh`——先全局安装：
 
 ```sh
 npm install -g @deepseek-ai/dsh
 ```
 
-### Add the bundle
-
-For local development (this repo):
+从本仓库安装：
 
 ```sh
-# 1. build the bundles (tsdown produces lib/index.js + lib/client.js)
+# 1. 构建产物（tsdown 生成 lib/index.js + lib/client.js）
 pnpm install
 pnpm build
 
-# 2. add the bundle to your web profile
+# 2. 加入 web profile
 dsh plugin --profile web add ./
 
-# 3. restart the harness with that profile
+# 3. 以该 profile 重启 harness
 dsh --profile web
 ```
 
-After the restart the ⬆ button appears in the composer tool row, next to the send button. Verify under Settings → Plugins that `dsh-composer-expand` is listed.
+重启后 ⬆ 按钮出现在 composer 工具行（发送按钮旁）。可在 设置 → 插件 中确认 `dsh-composer-expand` 已列出。
 
-## How it works
+## 工作原理
 
-| Piece | Mechanism |
+| 环节 | 机制 |
 | --- | --- |
-| Button seat | `conversation.input.right` list slot (session scope); `ctx.slots.inject` registers a single React component |
-| Toggle state | local React `useState` seeded from `localStorage[dsh-composer-expand:expanded]`; effect mirrors it back to localStorage on change |
-| DOM hook | `document.querySelector('[data-conversation-scroll]').classList.toggle('dsh-composer-expand-on', on)` — the official stable attribute on the conversation scrollport |
-| CSS contract | the `.dsh-composer-expand-on` class overrides `--dsh-composer-text-max-height` on `[data-composer-seat]` (the real 336px cap) to `var(--dsh-composer-expand-height)` (default `70vh`) and gives `[data-input-mirror]` a `min-height: 120px` so the box visibly grows even with little content |
-| Hard deps | `export const inject = ['slots', 'locale']` — both are official harness client services |
-| No host commands | `lib/index.js` is a no-op `apply()`; the whole plugin is client-side |
+| 按钮位 | `conversation.input.right` 列表槽位（会话作用域）；`ctx.slots.inject` 注册单个 React 组件 |
+| 切换状态 | React `useState`，初始值读 `localStorage[dsh-composer-expand:expanded]`；变更时写回 localStorage |
+| DOM 挂钩 | `document.querySelector('[data-conversation-scroll]').classList.toggle('dsh-composer-expand-on', on)` — 会话滚动容器上的官方稳定属性 |
+| CSS 契约 | `.dsh-composer-expand-on` 在 `[data-composer-seat]` 上覆盖 `--dsh-composer-text-max-height`（真正的 336px 上限）为 `var(--dsh-composer-expand-height)`（默认 `70vh`），并给 `[data-input-mirror]` 设 `min-height: 120px`，即使内容很少输入框也会明显变高 |
+| 硬依赖 | `export const inject = ['slots', 'locale']` — 均为官方 harness 客户端服务 |
+| 无 host 命令 | `lib/index.js` 是空 `apply()`，整个插件纯客户端 |
 
-## Build
+## 构建
 
 ```sh
 pnpm install
-pnpm build   # tsdown: lib/index.js (ESM host) + lib/client.js (ModuleLoader client bundle)
+pnpm build   # tsdown: lib/index.js（ESM host）+ lib/client.js（ModuleLoader 客户端 bundle）
 ```
 
-## Known limitations
+## 已知限制
 
-- The toggle is per browser, not per session. DSH renders only one composer at a time, so the mismatch is invisible today; if a future release ever renders more than one, narrow the DOM selector.
-- The expanded height is fixed at `70vh`. A future version could expose a height slider in a settings card.
-- The 336px cap (`--dsh-composer-text-max-height`) is a DSH design choice. This plugin only relaxes the composer textarea container, not the disclosure rows themselves.
+- 状态按浏览器记忆，不按会话。DSH 同一时刻只渲染一个 composer，目前无感知差异；若未来同时渲染多个，需要收窄 DOM 选择器。
+- 展开高度固定为 `70vh`。未来版本可在设置卡片里提供高度滑块。
+- `--dsh-composer-text-max-height`（336px）是 DSH 的设计选择。本插件只放宽 composer 文本框容器，不影响其他 disclosure 行。
 
 ## License
 
