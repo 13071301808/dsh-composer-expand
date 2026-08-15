@@ -17,7 +17,15 @@ The harness caps the composer textarea at a small height by default (the seat se
 
 ## Install
 
-### Prerequisites
+### From npm (recommended)
+
+```sh
+dsh plugin --profile web add dsh-composer-expand
+```
+
+Published to npm — prebuilt bundles, no build step.
+
+### From source (local development)
 
 The `dsh` CLI must be on your `PATH`. If you only ever ran the harness through `npx`, `dsh` is not installed and you will get `zsh: command not found: dsh` — install it globally first:
 

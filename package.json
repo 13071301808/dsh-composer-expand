@@ -36,6 +36,7 @@
     "resize"
   ],
   "license": "MIT",
+  "author": "xg1808",
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "react": "^18.2.0"
