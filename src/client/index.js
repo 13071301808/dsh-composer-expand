@@ -47,7 +47,7 @@ const CSS = [
   '.' + CLASS_ON + ' [data-composer-seat] { --dsh-composer-text-max-height: var(--' + CSS_VAR_HEIGHT + ') !important; }',
   // Stretch the input area even with little content: the hidden mirror
   // (data-input-mirror) is what actually sizes the textarea wrapper.
-  '.' + CLASS_ON + ' [data-input-mirror] { min-height: 120px !important; }',
+  '.' + CLASS_ON + ' [data-input-mirror] { min-height: 300px !important; }',
   // Belt-and-braces: keep the textarea itself under the tall cap.
   '.' + CLASS_ON + ' [data-composer-seat] textarea { max-height: var(--' + CSS_VAR_HEIGHT + ') !important; }',
   '.cpex-btn { display: inline-flex; align-items: center; gap: 4px; height: 24px; border: 1px solid rgba(127,127,137,.35); background: transparent; color: inherit; border-radius: 999px; padding: 0 9px; font-size: 12px; line-height: 1; cursor: pointer; opacity: .75; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity .12s ease, background-color .12s ease; }',
@@ -88,6 +88,42 @@ function writeStored(on) {
   try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (_) { /* private mode */ }
 }
 
+/**
+ * In expanded mode a plain Enter inserts a newline instead of triggering
+ * the harness send handler. Modifier shortcuts remain available for send.
+ * The listener is attached to the actual editor nodes so it runs before
+ * React's delegated keydown handler, while leaving the browser default
+ * newline behavior untouched.
+ */
+function bindExpandedEnterBehavior() {
+  if (typeof document === 'undefined') return;
+
+  const seat = document.querySelector('[data-composer-seat]');
+  if (!seat) return;
+
+  const bound = new Set();
+  const handleKeyDown = function (event) {
+    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    event.stopPropagation();
+  };
+  const bind = function () {
+    seat.querySelectorAll('textarea, [contenteditable="true"]').forEach(function (editor) {
+      if (bound.has(editor)) return;
+      editor.addEventListener('keydown', handleKeyDown);
+      bound.add(editor);
+    });
+  };
+
+  bind();
+  const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(bind);
+  if (observer) observer.observe(seat, { childList: true, subtree: true });
+
+  return function () {
+    if (observer) observer.disconnect();
+    bound.forEach(function (editor) { editor.removeEventListener('keydown', handleKeyDown); });
+  };
+}
+
 export function apply(ctx) {
   injectStyle();
 
@@ -114,6 +150,11 @@ export function apply(ctx) {
       const root = document.querySelector('[data-conversation-scroll]');
       if (root) root.classList.toggle(CLASS_ON, on);
       writeStored(on);
+    }, [on]);
+
+    useEffect(function () {
+      if (!on) return;
+      return bindExpandedEnterBehavior();
     }, [on]);
 
     const onClick = useCallback(function () { setOn(function (v) { return !v; }); }, []);
