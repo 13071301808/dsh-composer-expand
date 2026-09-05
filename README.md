@@ -13,6 +13,7 @@ DSH 默认把 composer 文本框封顶在一个较小高度（seat 上定义了 
 - **展开最小高度 300px** — 输入内容较少时也保持足够的书写空间；内容变多后最高仍受 `70vh` 限制。
 - **展开状态回车换行** — 展开时普通回车只插入换行，不触发发送；`Ctrl/Cmd + Enter` 等带修饰键快捷键仍可用于发送。
 - **浏览器内持久化** — 状态写入 `localStorage[dsh-composer-expand:expanded]`，刷新页面、切换工作区都保留。
+- **展开状态自愈** — 展开期间监听 DOM 重建：即使 harness 重建了会话滚动容器或 composer 卡片（切视图、切会话），展开样式与"回车换行"行为也会自动重新应用到新的输入框上。
 - **中英文双语** — 按钮文案与提示跟随 DSH 的 `locale` 服务。
 - **纯前端** — 无自定义协议、无 host 命令、无 LLM 调用、不进会话日志。
 - **不依赖构建哈希** — CSS 锚定 DSH 稳定的 `data-conversation-scroll` / `data-composer-seat` / `data-input-mirror` 属性，而不是每次构建都会变的哈希类名。
