@@ -1,5 +1,7 @@
 # dsh-composer-expand
 
+[![Listed on DSH Directory](https://dsh.directory/badges/listed.svg)](https://dsh.directory/plugins/13071301808/dsh-composer-expand)
+
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）打造的 composer 展开/收起插件。在 composer 工具行放一个 ⬆/⬇ 按钮，点击在「默认封顶高度」与「70vh 高书写视图」之间切换，长草稿不再挤在一个小窗口里滚动。
 
 ## 为什么需要
