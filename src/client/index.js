@@ -23,7 +23,24 @@
  * cap on the disclosure body) to a tall view, so long drafts no longer
  * scroll inside a tiny window. The 141px cap is a documented DSH design
  * choice for the disclosure rows; this plugin only affects the composer
- * textarea container, not the disclosure rows.
+ * input container, not the disclosure rows.
+ *
+ * Composer generations: the textarea-era harness sized the input through
+ * a hidden mirror (`data-input-mirror`); the Lexical-era composer
+ * (0.1.2-alpha.1+) exposes `[data-input-scroll]` (capped scrollport) and
+ * `[data-composer-input]` (contenteditable host). CSS anchors both, plus
+ * the legacy pair, and never touches hashed classes.
+ *
+ * Enter handling: the Lexical-era harness dispatches its send from a
+ * bubble-phase keydown listener on the editable root, so a listener on
+ * the same element cannot beat it. This plugin instead binds a
+ * CAPTURE-phase keydown on each composer seat — an ancestor's capture
+ * listener always runs before anything on the target — and calls
+ * stopPropagation() for plain Enter (no modifiers, not IME-composing,
+ * editor focused, no trigger menu open). The harness never sees the key,
+ * the contenteditable inserts its native line break, and Lexical
+ * reconciles the external DOM change. Shift/Ctrl/Cmd+Enter still reach
+ * the harness (newline / send unchanged).
  */
 import { createElement, useCallback, useEffect, useState } from 'react'
 
@@ -43,15 +60,22 @@ const CSS = [
   // [data-conversation-composer-overlay] anchor only exists in the
   // Trajectory view, so it is not used here.
   // Uncap the REAL height limit: the harness seat sets
-  // --dsh-composer-text-max-height (336px) which caps the textarea
-  // scrollport (.uV2eYG_scroll { max-height: var(...) }); overriding the
-  // variable on the seat relaxes that cap. max-height on the seat itself
-  // has no effect on the inner scrollport.
+  // --dsh-composer-text-max-height (336px) which caps the input scrollport
+  // (.scroll[data-input-scroll] { max-height: var(...) }); overriding the
+  // variable on the seat relaxes that cap. The variable lives on the seat
+  // in both composer generations (textarea-era and Lexical-era), so this
+  // rule is generation-agnostic.
   '.' + CLASS_ON + ' [data-composer-seat] { --dsh-composer-text-max-height: var(--' + CSS_VAR_HEIGHT + ') !important; }',
-  // Stretch the input area even with little content: the hidden mirror
-  // (data-input-mirror) is what actually sizes the textarea wrapper.
+  // Floor: keep enough writing space even with little content. The
+  // textarea-era composer sized the surface through a hidden mirror
+  // ([data-input-mirror]); the Lexical-era composer exposes
+  // [data-input-scroll] (capped scrollport) and [data-composer-input]
+  // (contenteditable host). Anchor both generations; hashed CSS classes
+  // are deliberately never used.
   '.' + CLASS_ON + ' [data-input-mirror] { min-height: 300px !important; }',
-  // Belt-and-braces: keep the textarea itself under the tall cap.
+  '.' + CLASS_ON + ' [data-input-scroll] { min-height: 300px !important; }',
+  '.' + CLASS_ON + ' [data-composer-input] { min-height: 260px !important; max-height: var(--' + CSS_VAR_HEIGHT + ') !important; }',
+  // Belt-and-braces: keep the editor surface under the tall cap.
   '.' + CLASS_ON + ' [data-composer-seat] textarea { max-height: var(--' + CSS_VAR_HEIGHT + ') !important; }',
   '.cpex-btn { display: inline-flex; align-items: center; gap: 4px; height: 24px; border: 1px solid rgba(127,127,137,.35); background: transparent; color: inherit; border-radius: 999px; padding: 0 9px; font-size: 12px; line-height: 1; cursor: pointer; opacity: .75; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity .12s ease, background-color .12s ease; }',
   '.cpex-btn:hover { opacity: 1; background: rgba(127,127,137,.12); }',
@@ -96,16 +120,26 @@ function writeStored(on) {
  *
  * While `on` is true two things must hold:
  *   1. the conversation scroll root carries the `CLASS_ON` class, and
- *   2. every editor inside a composer seat swallows plain Enter so it
- *      inserts a newline instead of triggering the harness send handler
- *      (modifier shortcuts remain available for send).
+ *   2. every composer seat swallows plain Enter typed into its editor so
+ *      it inserts a newline instead of triggering the harness send
+ *      handler (modifier shortcuts remain available for send).
  *
- * The harness can replace the scroll root / composer seat without remounting
- * this button (view switches, session changes), so a one-shot bind is not
- * enough: after the initial sweep a document-level MutationObserver
- * re-applies both whenever nodes are (re)added. Returns a cleanup that
- * disconnects the observer, strips the class and unbinds every listener
- * this round added.
+ * Enter interception binds a CAPTURE-phase keydown listener on each
+ * `[data-composer-seat]` element. An ancestor's capture listener always
+ * runs before any listener on the editable target — including the
+ * Lexical-era harness's bubble-phase keydown that dispatches the send —
+ * so stopPropagation() reliably suppresses the send while leaving the
+ * browser's native contenteditable line break untouched. Trigger menus
+ * (slash / @ pickers) render a [role="listbox"] inside the seat; while
+ * one is open, Enter must pick the highlighted candidate, so the
+ * interceptor stands down.
+ *
+ * The harness can replace the scroll root / composer seat without
+ * remounting this button (view switches, session changes), so a one-shot
+ * bind is not enough: after the initial sweep a document-level
+ * MutationObserver re-applies both whenever nodes are (re)added. Returns
+ * a cleanup that disconnects the observer, strips the class and unbinds
+ * every listener this round added.
  */
 function manageExpandedDom(on) {
   if (typeof document === 'undefined') return;
@@ -123,20 +157,27 @@ function manageExpandedDom(on) {
   const bound = new Set();
   const handleKeyDown = function (event) {
     if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    const target = event.target;
+    if (typeof Element === 'undefined' || !(target instanceof Element)) return;
+    const seat = target.closest('[data-composer-seat]');
+    if (!seat) return;
+    const editable = target.closest('[data-composer-input], textarea, [contenteditable="true"]');
+    if (!editable || !seat.contains(editable)) return; // only intercept typing inside the editor
+    if (seat.querySelector('[role="listbox"]')) return; // trigger menu open: Enter picks the candidate
     event.stopPropagation();
   };
   const applyClass = function () {
     const root = document.querySelector('[data-conversation-scroll]');
     if (root) root.classList.add(CLASS_ON);
   };
-  const bindEditors = function () {
-    document.querySelectorAll('[data-composer-seat] textarea, [data-composer-seat] [contenteditable="true"]').forEach(function (editor) {
-      if (bound.has(editor)) return;
-      editor.addEventListener('keydown', handleKeyDown);
-      bound.add(editor);
+  const bindSeats = function () {
+    document.querySelectorAll('[data-composer-seat]').forEach(function (seat) {
+      if (bound.has(seat)) return;
+      seat.addEventListener('keydown', handleKeyDown, true);
+      bound.add(seat);
     });
   };
-  const sweep = function () { applyClass(); bindEditors(); };
+  const sweep = function () { applyClass(); bindSeats(); };
 
   sweep();
   const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(function (mutations) {
@@ -151,7 +192,7 @@ function manageExpandedDom(on) {
     document.querySelectorAll('[data-conversation-scroll].' + CLASS_ON).forEach(function (root) {
       root.classList.remove(CLASS_ON);
     });
-    bound.forEach(function (editor) { editor.removeEventListener('keydown', handleKeyDown); });
+    bound.forEach(function (seat) { seat.removeEventListener('keydown', handleKeyDown, true); });
   };
 }
 

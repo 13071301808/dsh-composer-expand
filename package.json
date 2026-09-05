@@ -1,6 +1,6 @@
 {
   "name": "dsh-composer-expand",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Composer expand toggle for DeepSeek Harness: a ⬆/⬇ button in the composer tool row toggles the input between the default capped height and a tall 70vh writing view, so long drafts stay readable.",
   "repository": {
     "type": "git",
