@@ -79,6 +79,16 @@ pnpm build   # tsdown: lib/index.js（ESM host）+ lib/client.js（ModuleLoader 
 - 展开高度固定为 `70vh`。未来版本可在设置卡片里提供高度滑块。
 - `--dsh-composer-text-max-height`（336px）是 DSH 的设计选择。本插件只放宽 composer 文本框容器，不影响其他 disclosure 行。
 
+## DSH STORE 兼容与权限声明（供自动复检读取）
+
+- **Node.js**：`^22.19.0 || >=24.0.0`（见 `package.json engines`）。
+- **DSH 范围**：`>=0.1.0-rc.7 <0.3.0`；逐版本结论见 `package.json → dsh.compatibility.dshReleases`，官方最新三版（当前 `0.2.1-alpha.1 / alpha.2 / alpha.3`，另前瞻声明 `alpha.4`）均为 `compatible`。
+- **`dshOperations` 诚实声明为 `unknown`**：尚未提供一次性 Profile 的安装/启动/卸载/回滚证据，不虚构 `passed`。
+- **依赖**：`peerDependencies` 仅 `@deepseek-ai/cordis ^4.0.1` 与 `react ^18.2.0`（由 harness 提供，不打包）；客户端仅使用官方 `slots`、`locale` 服务，`dsh.client.inject` 仅声明 `@deepseek-ai/dsh-client-ui-conversation`；无 `preinstall/install/postinstall/prepare` 生命周期脚本。
+- **权限**：无文件、无网络、无命令、无凭据访问；仅写浏览器 `localStorage[dsh-composer-expand:expanded]`（插件私有展开状态），以及对 `[data-conversation-scroll]` / `[data-composer-seat]` 的 DOM class 与 capture 阶段 keydown 监听。无外部服务、无 host 命令、无 LLM 调用、不写会话日志。
+- **Entry IDs**：仅新增自有 ID —— Bundle Patch 插入 `composer-expand`，客户端 `slots.register` 为 `conversation.input.right / composer-expand`；不替换、不禁用任何 `@deepseek-ai/*` 官方包或受保护 entry。
+- **失败边界**：`localStorage` 不可用（隐私模式）则回落为默认收起；找不到 DOM 锚点则 no-op；`locale` 注册失败则回落英文并 `console.error`；卸载时 loader 移除插件自有 `<style>`，observer disconnect 并移除已加 class。
+
 ## License
 
 MIT
